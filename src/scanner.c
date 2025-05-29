@@ -9,6 +9,10 @@ typedef struct {
   const char *current;
   int line;
 
+  /* scanner will start parsing a string regardless
+   * of what it encounters */
+  bool stringOverrideMode;
+
   TokenType leftTokenStack[256];
   TokenType *leftTokenStackTop;
 } Scanner;
@@ -20,6 +24,7 @@ void initScanner(const char *source) {
   scanner.current = source;
   scanner.line = 1;
   scanner.leftTokenStackTop = scanner.leftTokenStack;
+  scanner.stringOverrideMode = false;
 }
 
 /* is at end of input */
@@ -57,6 +62,10 @@ TokenType popLeftToken() {
   return *scanner.leftTokenStackTop;
 }
 
+TokenType peekLeftToken() {
+  return scanner.leftTokenStackTop[-1];
+}
+
 Token makeLeftToken(TokenType value) {
 #ifdef DEBUG_TRACE_EXECUTION
   printf("          ");
@@ -90,13 +99,19 @@ Token makeRightToken(TokenType value) {
   switch (value) {
   case TOKEN_RIGHT_BRACE: {
     if (left != TOKEN_LEFT_BRACE) {
-      return errorToken("Unbalanced braces");
+      return errorToken("Unbalanced { }");
     }
     break;
   }
   case TOKEN_RIGHT_PAREN: {
     if (left != TOKEN_LEFT_PAREN) {
-      return errorToken("Unbalanced parenthesis");
+      return errorToken("Unbalanced ( )");
+    }
+    break;
+  }
+  case TOKEN_DOLLAR_RIGHT_BRACE: {
+    if (left != TOKEN_DOLLAR_LEFT_BRACE) {
+      return errorToken("Unbalanced ${ }");
     }
     break;
   }
@@ -277,6 +292,15 @@ static Token identifier() {
 }
 
 Token scanToken() {
+  if (scanner.stringOverrideMode == true) {
+    scanner.start = scanner.current;
+
+    // we pretend we encountered a "
+    scanner.stringOverrideMode = false;
+
+    return string();
+  }
+
   skipWhitespace();
   scanner.start = scanner.current;
 
@@ -295,6 +319,13 @@ Token scanToken() {
   }
 
   switch (c) {
+  case '$': {
+    if (!match('{')) {
+      return errorToken("Unexpect Token $");
+    }
+
+    return makeLeftToken(TOKEN_DOLLAR_LEFT_BRACE);
+  }
   case '(': {
     return makeLeftToken(TOKEN_LEFT_PAREN);
   }
@@ -303,7 +334,27 @@ Token scanToken() {
   case '{':
     return makeLeftToken(TOKEN_LEFT_BRACE);
   case '}':
-    return makeRightToken(TOKEN_RIGHT_BRACE);
+#ifdef DEBUG_TRACE_EXECUTION
+    printf("          ");
+    for (TokenType *slot = scanner.leftTokenStack;
+         slot < scanner.leftTokenStackTop; slot++) {
+      printf("[ ");
+      printf("%d", *slot);
+      printf(" ]");
+    }
+    printf("\n");
+    printf("stack top token: %d\n", scanner.leftTokenStackTop[-1]);
+#endif
+
+    if (peekLeftToken() == TOKEN_LEFT_BRACE) {
+      return makeRightToken(TOKEN_RIGHT_BRACE);
+    } else if (peekLeftToken() == TOKEN_DOLLAR_LEFT_BRACE) {
+      // the next token must be a string, possibly empty
+      scanner.stringOverrideMode = true;
+      return makeRightToken(TOKEN_DOLLAR_RIGHT_BRACE);
+    } else {
+      return errorToken("not a valid right brace");
+    }
   case ';':
     return makeToken(TOKEN_SEMICOLON);
   case ',':
