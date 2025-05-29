@@ -8,6 +8,9 @@ typedef struct {
   const char *start;
   const char *current;
   int line;
+
+  TokenType leftTokenStack[256];
+  TokenType *leftTokenStackTop;
 } Scanner;
 
 Scanner scanner;
@@ -16,6 +19,7 @@ void initScanner(const char *source) {
   scanner.start = source;
   scanner.current = source;
   scanner.line = 1;
+  scanner.leftTokenStackTop = scanner.leftTokenStack;
 }
 
 /* is at end of input */
@@ -41,6 +45,66 @@ static Token errorToken(const char *message) {
   token.line = scanner.line;
 
   return token;
+}
+
+void pushLeftToken(TokenType value) {
+  *scanner.leftTokenStackTop = value;
+  scanner.leftTokenStackTop++;
+}
+
+TokenType popLeftToken() {
+  scanner.leftTokenStackTop--;
+  return *scanner.leftTokenStackTop;
+}
+
+Token makeLeftToken(TokenType value) {
+#ifdef DEBUG_TRACE_EXECUTION
+  printf("          ");
+  for (TokenType *slot = scanner.leftTokenStack;
+       slot < scanner.leftTokenStackTop; slot++) {
+    printf("[ ");
+    printf("%d", *slot);
+    printf(" ]");
+  }
+  printf("\n");
+#endif
+
+  pushLeftToken(value);
+
+  return makeToken(value);
+}
+
+Token makeRightToken(TokenType value) {
+#ifdef DEBUG_TRACE_EXECUTION
+  printf("          ");
+  for (TokenType *slot = scanner.leftTokenStack;
+       slot < scanner.leftTokenStackTop; slot++) {
+    printf("[ ");
+    printf("%d", *slot);
+    printf(" ]");
+  }
+  printf("\n");
+#endif
+  TokenType left = popLeftToken();
+
+  switch (value) {
+  case TOKEN_RIGHT_BRACE: {
+    if (left != TOKEN_LEFT_BRACE) {
+      return errorToken("Unbalanced braces");
+    }
+    break;
+  }
+  case TOKEN_RIGHT_PAREN: {
+    if (left != TOKEN_LEFT_PAREN) {
+      return errorToken("Unbalanced parenthesis");
+    }
+    break;
+  }
+  default:
+    return errorToken("Error parsing right token");
+  }
+
+  return makeToken(value);
 }
 
 static char advance() {
@@ -98,6 +162,11 @@ static void skipWhitespace() {
 
 static Token string() {
   while (peek() != '"' && !isAtEnd()) {
+    // also want to check for ${
+    if (peek() == '$' && peekNext() == '{') {
+      return makeToken(TOKEN_STRING);
+    }
+
     if (peek() == '\n') {
       scanner.line++;
     }
@@ -226,14 +295,15 @@ Token scanToken() {
   }
 
   switch (c) {
-  case '(':
-    return makeToken(TOKEN_LEFT_PAREN);
+  case '(': {
+    return makeLeftToken(TOKEN_LEFT_PAREN);
+  }
   case ')':
-    return makeToken(TOKEN_RIGHT_PAREN);
+    return makeRightToken(TOKEN_RIGHT_PAREN);
   case '{':
-    return makeToken(TOKEN_LEFT_BRACE);
+    return makeLeftToken(TOKEN_LEFT_BRACE);
   case '}':
-    return makeToken(TOKEN_RIGHT_BRACE);
+    return makeRightToken(TOKEN_RIGHT_BRACE);
   case ';':
     return makeToken(TOKEN_SEMICOLON);
   case ',':
