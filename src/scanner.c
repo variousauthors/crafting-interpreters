@@ -67,33 +67,12 @@ TokenType peekLeftToken() {
 }
 
 Token makeLeftToken(TokenType value) {
-#ifdef DEBUG_TRACE_EXECUTION
-  printf("          ");
-  for (TokenType *slot = scanner.leftTokenStack;
-       slot < scanner.leftTokenStackTop; slot++) {
-    printf("[ ");
-    printf("%d", *slot);
-    printf(" ]");
-  }
-  printf("\n");
-#endif
-
   pushLeftToken(value);
 
   return makeToken(value);
 }
 
 Token makeRightToken(TokenType value) {
-#ifdef DEBUG_TRACE_EXECUTION
-  printf("          ");
-  for (TokenType *slot = scanner.leftTokenStack;
-       slot < scanner.leftTokenStackTop; slot++) {
-    printf("[ ");
-    printf("%d", *slot);
-    printf(" ]");
-  }
-  printf("\n");
-#endif
   TokenType left = popLeftToken();
 
   switch (value) {
@@ -334,18 +313,6 @@ Token scanToken() {
   case '{':
     return makeLeftToken(TOKEN_LEFT_BRACE);
   case '}':
-#ifdef DEBUG_TRACE_EXECUTION
-    printf("          ");
-    for (TokenType *slot = scanner.leftTokenStack;
-         slot < scanner.leftTokenStackTop; slot++) {
-      printf("[ ");
-      printf("%d", *slot);
-      printf(" ]");
-    }
-    printf("\n");
-    printf("stack top token: %d\n", scanner.leftTokenStackTop[-1]);
-#endif
-
     if (peekLeftToken() == TOKEN_LEFT_BRACE) {
       return makeRightToken(TOKEN_RIGHT_BRACE);
     } else if (peekLeftToken() == TOKEN_DOLLAR_LEFT_BRACE) {
