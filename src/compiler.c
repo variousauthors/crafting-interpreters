@@ -5,6 +5,10 @@
 #include "compiler.h"
 #include "scanner.h"
 
+#ifdef DEBUG_PRINT_CODE
+#include "debug.h"
+#endif
+
 typedef struct {
   Token current;
   Token previous;
@@ -12,9 +16,12 @@ typedef struct {
   bool panicMode;
 } Parser;
 
+// a = -(1 - 1) ? 4 * 5 : 1 + 1
+
 typedef enum {
   PREC_NONE,
   PREC_ASSIGNMENT, // =
+  PREC_TERNARY,    // ?:
   PREC_OR,         // or
   PREC_AND,        // and
   PREC_EQUALITY,   // == !=
@@ -100,6 +107,11 @@ static void emitReturn() {
 
 static void endCompiler() {
   emitReturn();
+#ifdef DEBUG_PRINT_CODE
+  if (!parser.hadError) {
+    disassembleChunk(currentChunk(), "code");
+  }
+#endif
 }
 
 static void emitBytes(uint8_t byte1, uint8_t byte2) {
@@ -138,13 +150,24 @@ static void parsePrecedence(Precedence precedence) {
 
   while (precedence <= getRule(parser.current.type)->precedence) {
     advance();
-    ParseFn infixRule = getRule(parser.current.type)->infix;
+    ParseFn infixRule = getRule(parser.previous.type)->infix;
     infixRule();
   }
 }
 
 static void expression() {
   parsePrecedence(PREC_ASSIGNMENT);
+}
+
+static void ternary() {
+  // for (1 - 1) ? 4 * 5 : -1 + 2
+  // for 1 - 1 ? 4 * 5 : -1 + 2
+  TokenType operatorType = parser.previous.type;
+  ParseRule *rule = getRule(operatorType);
+
+  expression();
+  consume(TOKEN_COLON, "Expect ':' after first expression.");
+  expression();
 }
 
 static void binary() {
@@ -208,6 +231,7 @@ ParseRule rules[] = {
     [TOKEN_MINUS] = {unary, binary, PREC_TERM},
     [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
+    [TOKEN_QUESTION_MARK] = {NULL, ternary, PREC_TERNARY},
     [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
     [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
     [TOKEN_BANG] = {NULL, NULL, PREC_NONE},
