@@ -97,6 +97,18 @@ static InterpretResult run() {
     case OP_FALSE:
       push(BOOL_VAL(false));
       break;
+    case OP_EQUAL: {
+      Value b = pop();
+      Value a = pop();
+      push(BOOL_VAL(valuesEqual(a, b)));
+      break;
+    }
+    case OP_GREATER:
+      BINARY_OP(BOOL_VAL, >);
+      break;
+    case OP_LESS:
+      BINARY_OP(BOOL_VAL, <);
+      break;
     case OP_ADD:
       BINARY_OP(NUMBER_VAL, +);
       break;
@@ -146,4 +158,20 @@ InterpretResult interpret(const char *source) {
   freeChunk(&chunk);
 
   return result;
+}
+
+bool valuesEqual(Value a, Value b) {
+  if (a.type != b.type)
+    return false;
+
+  switch (a.type) {
+  case VAL_BOOL:
+    return AS_BOOL(a) == AS_BOOL(b);
+  case VAL_NIL:
+    return true;
+  case VAL_NUMBER:
+    return AS_NUMBER(a) == AS_NUMBER(b);
+  default:
+    return false; // unreachable
+  }
 }
