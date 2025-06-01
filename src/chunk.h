@@ -2,12 +2,14 @@
 #define clox_chunk_h
 
 #include "common.h"
-#include "value.h"
 #include "line_numbers.h"
+#include "value.h"
 
-typedef enum
-{
+typedef enum {
   OP_CONSTANT,
+  OP_NIL,
+  OP_TRUE,
+  OP_FALSE,
   OP_ADD,
   OP_SUBTRACT,
   OP_MULTIPLY,
@@ -16,8 +18,7 @@ typedef enum
   OP_RETURN,
 } OpCode;
 
-typedef struct
-{
+typedef struct {
   int count;
   int capacity;
   /* pointer to the first address
