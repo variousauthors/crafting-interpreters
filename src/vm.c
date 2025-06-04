@@ -96,7 +96,7 @@ static InterpretResult run() {
       printf(" ]");
     }
     printf("\n");
-    disassembleInstruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
+    // disassembleInstruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
 #endif
 
     uint8_t instruction;
@@ -123,10 +123,30 @@ static InterpretResult run() {
     case OP_POP:
       pop();
       break;
+    case OP_GET_GLOBAL: {
+      ObjString *name = READ_STRING();
+      Value value;
+
+      if (!tableGet(&vm.globals, name, &value)) {
+        runtimeError("Undefined variable '%s'.", name->chars);
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      push(value);
+      break;
+    }
     case OP_DEFINE_GLOBAL: {
       ObjString *name = READ_STRING();
       tableSet(&vm.globals, name, peek(0));
       pop();
+      break;
+    }
+    case OP_SET_GLOBAL: {
+      ObjString *name = READ_STRING();
+      if (tableSet(&vm.globals, name, peek(0))) {
+        tableDelete(&vm.globals, name);
+        runtimeError("Undefined variable '%s'.", name->chars);
+        return INTERPRET_RUNTIME_ERROR;
+      }
       break;
     }
     case OP_EQUAL: {
