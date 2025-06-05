@@ -253,7 +253,7 @@ static uint8_t parseVariable(const char *errorMessage) {
 }
 
 static void markInitialized() {
-  current->locals[current->localCount].depth = current->scopeDepth;
+  current->locals[current->localCount - 1].depth = current->scopeDepth;
 }
 
 static void defineVariable(uint8_t global) {
